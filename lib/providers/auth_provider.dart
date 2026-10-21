@@ -1,25 +1,93 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart'hide AuthProvider;
 
 class AuthProvider extends ChangeNotifier {
-  bool _isAuthenticated = false;
-  String? _token;
 
-  bool get isAuthenticated => _isAuthenticated;
-  String? get token => _token;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  
+  User? _user;
+
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  User? get user => _user;
+
+  bool get isAuthenticated => _user != null;
+  String? get token => null; // Placeholder for token management
+
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+
+  
+  void setUser(User? user) {
+    _user = user;
+    notifyListeners();
+  }
+
+  Future<bool> register(String email, String password) async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      final cred = await _auth.createUserWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      _user = cred.user;
+      return true;
+    } on FirebaseAuthException catch (e) {
+      _errorMessage = _pesanError(e.code);
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
 
   Future<bool> login(String email, String password) async {
-    await Future.delayed(const Duration(seconds: 1));
-    if (email.isNotEmpty && password.length >= 6) {
-      _isAuthenticated = true;
-      _token = 'dummy_token_dummy_12345';
-      notifyListeners();
-      return true;
-    } 
-    return false;
-  }
-  void logout() {
-    _isAuthenticated = false;
-    _token = null;
+    _isLoading = true;
+    _errorMessage = null;
     notifyListeners();
+
+    try {
+      final cred = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      _user = cred.user;
+      return true;
+    } on FirebaseAuthException catch (e) {
+      _errorMessage = _pesanError(e.code);
+      return false;
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> logout() async {
+    await _auth.signOut();
+  }
+   String _pesanError(String kode) {
+   if (kode == 'user-not-found' || kode == 'invalid-credential') {
+    return 'Email atau password salah';
+    } 
+    if (kode == 'email-already-in-use') {
+      return 'Email ini telah digunakan';
+    }
+    if (kode == 'weak-password') {
+      return 'Password minimal 6 karakter';
+    }
+    if (kode == 'invalid-email') {
+      return 'Format email salah';
+    }
+    if (kode == 'confirmation-not-found') {
+      return 'auth belum di aktifkan, cek console untuk melihat link konfirmasi';
+    }
+    if (kode == 'network-request-failed') {
+      return 'Tidak ada koneksi internet';
+    }
+    return 'Terjadi kesalahan,($kode)';
   }
 }

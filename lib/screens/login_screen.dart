@@ -12,25 +12,34 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  bool _isLoading = false;
+  bool _isRegisteringMode = false;
 
-  Future<void> _handleLogin() async {
-    setState(() => _isLoading = true);
-    final success = await Provider.of<AuthProvider>(context, listen: false)
-        .login(_emailController.text, _passwordController.text);
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleSubmit() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final success = _isRegisteringMode
+        ? await auth.register(_emailController.text, _passwordController.text)
+        : await auth.login(_emailController.text, _passwordController.text);
+
     if (!mounted) return;
-    setState(() => _isLoading = false);
+
     if (!success) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Login Gagal! Password min 6 karakter.')),
+        SnackBar(content: Text(auth.errorMessage ?? 'Terjadi kesalahan')),
       );
-    }
+    } 
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Login Provider')),
+      appBar: AppBar(title: Text(_isRegisteringMode ? 'Daftar' : 'Masuk')),
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
@@ -43,12 +52,14 @@ class _LoginScreenState extends State<LoginScreen> {
               ),
               const SizedBox(height: 16),
               Text(
-                'Selamat Datang',
+                _isRegisteringMode ? 'Buat Akun Baru' : 'Selamat Datang',
                 style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 4),
               Text(
-                'Masuk untuk melihat daftar pengguna',
+                _isRegisteringMode
+                    ? 'Silakan isi formulir untuk mendaftar.'
+                    : 'Masukkan email dan kata sandi Anda untuk masuk.',
                 style: Theme.of(context)
                     .textTheme
                     .bodyMedium
@@ -91,29 +102,39 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(
                 width: double.infinity,
                 height: 48,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                child: Consumer<AuthProvider>(
+                  builder: (context, auth, _) => ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
+                    onPressed: auth.isLoading ? null : _handleSubmit,
+                    child: auth.isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : Text(_isRegisteringMode ? 'Daftar' : 'Masuk'),
                   ),
-                  onPressed: _isLoading ? null : _handleLogin,
-                  child: _isLoading
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Text('Login'),
                 ),
               ),
               const SizedBox(height: 12),
-              Text(
-                'Demo: email apa saja + password min 6 karakter',
-                style: Theme.of(context)
-                    .textTheme
-                    .bodySmall
-                    ?.copyWith(color: Colors.grey[600]),
+              TextButton(
+                  onPressed: () => setState(() => _isRegisteringMode = !_isRegisteringMode),
+                  child: Text(
+                    _isRegisteringMode
+                        ? 'Sudah punya akun? Masuk'
+                        : 'Belum punya akun? Daftar',
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                
               ),
             ],
           ),
